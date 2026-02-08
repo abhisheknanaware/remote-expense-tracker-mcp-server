@@ -125,6 +125,75 @@ def categories():
             return json.dumps(default_categories, indent=2)
     except Exception as e:
         return f'{{"error": "Could not load categories: {str(e)}"}}'
+
+@mcp.tool()
+async def delete_expense(date, category, note=""):
+    """Delete expense(s) matching date, category, and note"""
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """
+                DELETE FROM expenses
+                WHERE date = ? AND category = ? AND note = ?
+                """,
+                (date, category, note)
+            )
+            await c.commit()
+
+            return {
+                "status": "success",
+                "deleted_rows": cur.rowcount
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error deleting expense: {str(e)}"
+        }
+@mcp.tool()
+async def edit_expense(
+    date,
+    category,
+    new_amount,
+    new_date=None,
+    new_subcategory=None,
+    new_note=None
+):
+    """
+    Edit an expense.
+    If new_date / new_subcategory / new_note is None, existing value is kept.
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as c:
+            cur = await c.execute(
+                """
+                UPDATE expenses
+                SET
+                    amount = ?,
+                    date = COALESCE(?, date),
+                    subcategory = COALESCE(?, subcategory),
+                    note = COALESCE(?, note)
+                WHERE date = ? AND category = ?
+                """,
+                (
+                    new_amount,
+                    new_date,
+                    new_subcategory,
+                    new_note,
+                    date,
+                    category
+                )
+            )
+            await c.commit()
+
+            return {
+                "status": "success",
+                "updated_rows": cur.rowcount
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error editing expense: {str(e)}"
+        }
       
 if __name__ == "__main__":
     mcp.run(transport='http',host="0.0.0.0",port='8000')
